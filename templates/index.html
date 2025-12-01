@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>استودیو پردازش صدای هوشمند (نسخه پرو)</title>
+    <script src="https://unpkg.com/wavesurfer.js@7"></script>
+    <style>
+        :root {
+            --bg-color: #1e272e;
+            --card-color: #2f3640;
+            --text-color: #f5f6fa;
+            --accent-color: #00a8ff;
+            --music-color: #00b894; /* Green for music */
+            --secondary-color: #e84118;
+            --slider-track: #718093;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .studio-container {
+            width: 100%;
+            max-width: 800px;
+        }
+
+        h1 { text-align: center; color: var(--accent-color); margin-bottom: 30px; }
+
+        /* --- VISUALIZER --- */
+        .visualizer-box {
+            background: #000;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #444;
+            box-shadow: 0 0 20px rgba(0,168,255, 0.1);
+            margin-bottom: 25px;
+        }
+        #waveform { width: 100%; }
+        
+        .transport-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .btn-transport {
+            background: transparent;
+            border: 1px solid var(--accent-color);
+            color: var(--accent-color);
+            padding: 8px 24px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .btn-transport:hover { background: var(--accent-color); color: white; }
+
+        /* --- UPLOAD SECTION --- */
+        .upload-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--card-color);
+            padding: 15px 25px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+        }
+
+        .file-upload-btn {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            cursor: pointer;
+        }
+        .file-upload-btn input[type=file] {
+            position: absolute;
+            left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer;
+        }
+        .btn-std {
+            background: #353b48;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+        }
+
+        /* --- RACK MODULES --- */
+        .rack {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+
+        .module {
+            background: var(--card-color);
+            border-radius: 10px;
+            padding: 20px;
+            border-right: 4px solid transparent;
+            transition: 0.3s;
+        }
+        .module.active {
+            border-right-color: var(--accent-color);
+            background: #373e4a;
+        }
+        
+        /* Specific Style for Music Module */
+        .module.music-module {
+            border-right: 4px solid var(--music-color);
+            background: #252b30;
+        }
+
+        .module-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .module-title { font-weight: bold; font-size: 1.1rem; display: flex; align-items: center; gap: 8px; }
+        .help-icon { color: #7f8fa6; cursor: help; font-size: 0.9rem; border: 1px solid #7f8fa6; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
+
+        /* Toggle Switch */
+        .switch { position: relative; display: inline-block; width: 46px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider-switch { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #555; transition: .4s; border-radius: 34px; }
+        .slider-switch:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider-switch { background-color: var(--accent-color); }
+        input:checked + .slider-switch:before { transform: translateX(22px); }
+
+        /* Range Sliders */
+        .controls-area {
+            opacity: 0.4; pointer-events: none; transition: 0.3s;
+            margin-top: 10px;
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .module.active .controls-area, .module.music-module .controls-area { opacity: 1; pointer-events: all; }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .slider-label { flex: 1; font-size: 0.9rem; }
+        .slider-val { 
+            font-family: monospace; 
+            color: var(--accent-color); 
+            font-weight: bold; 
+            width: 40px; 
+            text-align: center; 
+        }
+
+        input[type=range] {
+            flex: 3;
+            height: 6px;
+            border-radius: 5px;
+            background: var(--slider-track);
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+        }
+        
+        /* Inputs for numbers */
+        .input-num {
+            background: #444;
+            border: 1px solid #555;
+            color: white;
+            border-radius: 5px;
+            padding: 5px;
+            width: 60px;
+            text-align: center;
+        }
+
+        /* --- FOOTER ACTION --- */
+        .action-bar {
+            margin-top: 30px;
+            text-align: center;
+        }
+        
+        .btn-process {
+            background: linear-gradient(45deg, var(--accent-color), #0984e3);
+            color: white;
+            border: none;
+            padding: 15px 50px;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,168,255,0.4);
+            transition: transform 0.2s;
+        }
+        .btn-process:active { transform: scale(0.95); }
+        .btn-process:disabled { background: #555; cursor: not-allowed; box-shadow: none; }
+
+        .btn-download {
+            display: none;
+            background: var(--secondary-color);
+            color: white;
+            text-decoration: none;
+            padding: 10px 30px;
+            border-radius: 30px;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        .loader { display: none; margin-top: 10px; color: var(--accent-color); }
+
+    </style>
+</head>
+<body>
+
+<div class="studio-container">
+    <h1>🎚️ استودیو پرو (Pedalboard Engine)</h1>
+
+    <div class="visualizer-box">
+        <div id="waveform"></div>
+        <div class="transport-controls">
+            <button class="btn-transport" onclick="wavesurfer.playPause()">پخش / توقف</button>
+            <span id="time-display" style="align-self:center; direction:ltr;">00:00</span>
+        </div>
+    </div>
+
+    <div class="upload-section">
+        <div class="file-upload-btn">
+            <button class="btn-std">🎤 انتخاب فایل صدای اصلی</button>
+            <input type="file" id="audioInput" accept="audio/*" onchange="handleFileSelect(this, 'fileName')">
+        </div>
+        <div id="fileName">فایلی انتخاب نشده</div>
+    </div>
+
+    <div class="rack">
+        
+        <div class="module music-module" id="mod_music">
+            <div class="module-header">
+                <div class="module-title">
+                    <span class="help-icon" title="افزودن آهنگ پس‌زمینه">?</span>
+                    &nbsp; 🎵 آهنگ پس‌زمینه
+                </div>
+                <div class="file-upload-btn">
+                    <button class="btn-std" style="background: var(--music-color); padding: 5px 15px; font-size: 0.8rem;">انتخاب موزیک</button>
+                    <input type="file" id="bgInput" accept="audio/*" onchange="handleFileSelect(this, 'bgName')">
+                </div>
+            </div>
+            
+            <div style="text-align:center; font-size:0.8rem; margin-bottom:10px; color: var(--music-color);" id="bgName">
+                موزیکی انتخاب نشده
+            </div>
+
+            <div class="controls-area">
+                <div class="slider-row" style="justify-content: space-around;">
+                    <div>
+                        <label style="font-size:0.8rem">برش آهنگ - شروع:</label>
+                        <input type="number" id="bg_start" class="input-num" value="0" min="0">
+                    </div>
+                    <div>
+                        <label style="font-size:0.8rem">پایان:</label>
+                        <input type="number" id="bg_end" class="input-num" placeholder="انتها" min="0">
+                    </div>
+                </div>
+
+                <div class="slider-row" style="justify-content: space-around; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
+                    <div>
+                        <label style="font-size:0.8rem">زمان شروع فید (ثانیه):</label>
+                        <input type="number" id="bg_fade_start" class="input-num" placeholder="0" min="0">
+                    </div>
+                    <div>
+                        <label style="font-size:0.8rem">مدت شیب فید (ثانیه):</label>
+                        <input type="number" id="bg_fade_len" class="input-num" value="3" min="1">
+                    </div>
+                </div>
+
+                <div class="slider-row">
+                    <span class="slider-label">صدای موزیک:</span>
+                    <input type="range" id="rng_bg_vol" min="0" max="100" value="20" oninput="updateVal('val_bg', this.value)">
+                    <span class="slider-val" id="val_bg">20</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="module" id="mod_nr">
+            <div class="module-header">
+                <div class="module-title">
+                    <span class="help-icon" title="حذف نویز پس‌زمینه با الگوریتم Spectral Gating">?</span>
+                    &nbsp; حذف نویز (De-Noise)
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="chk_nr" onchange="toggleModule('mod_nr')">
+                    <span class="slider-switch"></span>
+                </label>
+            </div>
+            <div class="controls-area">
+                <div class="slider-row">
+                    <span class="slider-label">قدرت حذف:</span>
+                    <input type="range" id="rng_nr" min="0" max="100" value="50" oninput="updateVal('val_nr', this.value)">
+                    <span class="slider-val" id="val_nr">50</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="module" id="mod_pod">
+            <div class="module-header">
+                <div class="module-title">
+                    <span class="help-icon" title="کمپرسور، لیمیتر و گیت برای صدای رادیویی حرفه‌ای">?</span>
+                    &nbsp; صدای پادکست حرفه‌ای
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="chk_pod" onchange="toggleModule('mod_pod')">
+                    <span class="slider-switch"></span>
+                </label>
+            </div>
+            <div class="controls-area">
+                <div class="slider-row">
+                    <span class="slider-label">شدت (Compression):</span>
+                    <input type="range" id="rng_pod" min="0" max="100" value="65" oninput="updateVal('val_pod', this.value)">
+                    <span class="slider-val" id="val_pod">65</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="module" id="mod_vin">
+            <div class="module-header">
+                <div class="module-title">
+                    <span class="help-icon" title="محدود کردن فرکانس و اضافه کردن دیستورشن لامپی">?</span>
+                    &nbsp; افکت رادیوی قدیمی
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="chk_vin" onchange="toggleModule('mod_vin')">
+                    <span class="slider-switch"></span>
+                </label>
+            </div>
+            <div class="controls-area">
+                <div class="slider-row">
+                    <span class="slider-label">میزان کهنگی:</span>
+                    <input type="range" id="rng_vin" min="0" max="100" value="80" oninput="updateVal('val_vin', this.value)">
+                    <span class="slider-val" id="val_vin">80</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="module" id="mod_mic">
+            <div class="module-header">
+                <div class="module-title">
+                    <span class="help-icon" title="اعمال EQ شبیه به میکروفون Shure SM7B">?</span>
+                    &nbsp; شبیه‌ساز میکروفون
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="chk_mic" onchange="toggleModule('mod_mic')">
+                    <span class="slider-switch"></span>
+                </label>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="action-bar">
+        <button class="btn-process" id="processBtn" onclick="processAudio()">⚡ پردازش و میکس</button>
+        <div class="loader" id="loader">در حال پردازش صدا و میکس آهنگ...</div>
+        <br>
+        <a href="#" class="btn-download" id="downloadBtn" download="final_mix.mp3">دانلود فایل نهایی</a>
+    </div>
+
+</div>
+
+<script>
+    // 1. Initialize Visualizer
+    const wavesurfer = WaveSurfer.create({
+        container: '#waveform',
+        waveColor: '#7f8fa6',
+        progressColor: '#00a8ff',
+        cursorColor: '#ffffff',
+        barWidth: 2,
+        barGap: 3,
+        height: 100,
+        normalize: true
+    });
+
+    wavesurfer.on('timeupdate', (currentTime) => {
+        const date = new Date(0);
+        date.setSeconds(currentTime);
+        document.getElementById('time-display').innerText = date.toISOString().substr(14, 5);
+    });
+
+    let voiceFile = null;
+    let musicFile = null;
+
+    // 2. UI Logic
+    function handleFileSelect(input, labelId) {
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            document.getElementById(labelId).innerText = file.name;
+            
+            // Check ID to see if it is voice or music
+            if(input.id === 'audioInput') {
+                voiceFile = file;
+                const objectUrl = URL.createObjectURL(file);
+                wavesurfer.load(objectUrl);
+            } else if (input.id === 'bgInput') {
+                musicFile = file;
+            }
+        }
+    }
+
+    function toggleModule(id) {
+        const el = document.getElementById(id);
+        el.classList.toggle('active');
+    }
+
+    function updateVal(spanId, val) {
+        document.getElementById(spanId).innerText = val;
+    }
+
+    // 3. Process Logic
+    async function processAudio() {
+        if (!voiceFile) {
+            alert('لطفاً ابتدا فایل صدای اصلی را انتخاب کنید');
+            return;
+        }
+
+        // UI State
+        const btn = document.getElementById('processBtn');
+        const loader = document.getElementById('loader');
+        const dlBtn = document.getElementById('downloadBtn');
+
+        btn.disabled = true;
+        loader.style.display = 'block';
+        dlBtn.style.display = 'none';
+
+        // Prepare Data
+        const formData = new FormData();
+        formData.append('audio_file', voiceFile);
+        
+        // Add Music File if exists
+        if(musicFile) {
+            formData.append('bg_file', musicFile);
+            formData.append('bg_start', document.getElementById('bg_start').value);
+            formData.append('bg_end', document.getElementById('bg_end').value);
+            formData.append('bg_vol', document.getElementById('rng_bg_vol').value);
+            
+            // NEW: Fade Params
+            formData.append('bg_fade_start', document.getElementById('bg_fade_start').value);
+            formData.append('bg_fade_len', document.getElementById('bg_fade_len').value);
+        }
+
+        // Get Effects Values
+        formData.append('enable_nr', document.getElementById('chk_nr').checked);
+        formData.append('val_nr', document.getElementById('rng_nr').value);
+
+        formData.append('enable_podcast', document.getElementById('chk_pod').checked);
+        formData.append('val_podcast', document.getElementById('rng_pod').value);
+
+        formData.append('enable_vintage', document.getElementById('chk_vin').checked);
+        formData.append('val_vintage', document.getElementById('rng_vin').value);
+
+        formData.append('enable_mic', document.getElementById('chk_mic').checked);
+
+        try {
+            const response = await fetch('/process', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) throw new Error('Processing Failed');
+
+            const blob = await response.blob();
+            const audioUrl = URL.createObjectURL(blob);
+
+            // Update Visualizer to show the MIXED result
+            wavesurfer.load(audioUrl);
+            wavesurfer.once('ready', () => wavesurfer.play());
+
+            // Setup Download
+            dlBtn.href = audioUrl;
+            dlBtn.style.display = 'inline-block';
+
+        } catch (error) {
+            alert('خطا: ' + error.message);
+        } finally {
+            btn.disabled = false;
+            loader.style.display = 'none';
+        }
+    }
+</script>
+
+</body>
+</html>
